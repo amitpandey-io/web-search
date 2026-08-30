@@ -1,4 +1,4 @@
-# lmstudio-web-search
+# web-search
 
 A [DSH](https://github.com/deepseek-ai/deepseek-harness) web-seam search
 provider ported from the
@@ -22,7 +22,7 @@ No API key required. Optional reranking via a local LM Studio
 
 ```sh
 mkdir -p ~/.dsh/profiles/node_modules
-cp -R <this directory> ~/.dsh/profiles/node_modules/lmstudio-web-search
+cp -R <this directory> ~/.dsh/profiles/node_modules/web-search
 ```
 
 Do **not** install it into a profile's own `node_modules`
@@ -37,8 +37,8 @@ applied after every bundle layer) and append:
 
 ```yaml
 - insert:
-    - id: web-search-lmstudio
-      name: 'lmstudio-web-search'
+    - id: web-search
+      name: 'web-search'
       config:
         defaultLanguage: en-us
         searchRecencyWindow: year

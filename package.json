@@ -1,5 +1,5 @@
 {
-  "name": "lmstudio-web-search",
+  "name": "web-search",
   "version": "1.0.1",
   "private": true,
   "description": "DSH web seam (ctx.web) search provider ported from the LM Studio web-search plugin (lmstudio.ai/altra/web-search): keyless SearXNG/DDG/Bing scraping",

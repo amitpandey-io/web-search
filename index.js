@@ -13,7 +13,7 @@ import { WebError } from "@deepseek-ai/dsh-web";
 import { ddgSearch, rerankHits } from "./lmstudioSearch.js";
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = "web-search-lmstudio";
+export const name = "web-search";
 /** The web seam this provider registers into. */
 export const inject = ["web"];
 /** Stable id this provider registers under. */
