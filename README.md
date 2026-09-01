@@ -16,21 +16,52 @@ tiered search:
 No API key required. Optional reranking via a local LM Studio
 `nomic-embed-text` embeddings endpoint.
 
-## Install
+## Install for DSH
+
+This is a **plain module** — it declares no `dsh.bundle`, so it is installed
+by copying the package into DSH's shared profile node tree and wiring the web
+seam to it with a cordis patch. Do **not** use `dsh plugin add`: that installs
+into the profile's own `node_modules` (invisible to other profiles) and,
+without a `dsh.bundle`, never joins the layer stack.
+
+### 0. Prerequisites
+
+- `dsh` is on PATH (or invoke the CLI via node, e.g.
+  `node /opt/homebrew/lib/node_modules/@deepseek-ai/dsh/lib/bin.js`).
+- DSH home is resolved by `resolveDshHome()`: an explicit configured path,
+  then `$DSH_HOME`, then `~/.dsh`. The examples use `~/.dsh` (the default);
+  substitute `$DSH_HOME` if you set it.
 
 ### 1. Copy the package into the shared profile node tree
 
+The shared tree is `$DSH_HOME/profiles/node_modules` — the flat fallback
+every profile's loader resolves through. Copy the plugin files (not `.git`):
+
 ```sh
-mkdir -p ~/.dsh/profiles/node_modules
-cp -R <this directory> ~/.dsh/profiles/node_modules/web-search
+mkdir -p ~/.dsh/profiles/node_modules/web-search
+cp README.md index.js lmstudioSearch.js package.json \
+  ~/.dsh/profiles/node_modules/web-search/
 ```
 
 Do **not** install it into a profile's own `node_modules`
 (e.g. `~/.dsh/profiles/web/node_modules`): each profile's loader resolves a
 cordis row's `name` from that profile's directory tree, so a per-profile
-copy is invisible to the other profiles.
+copy is invisible to the other profiles (e.g. `headless`).
 
-### 2. Add the rows to the target profile's `cordis.patch.yml`
+### 2. Vendor the source (optional, matches the reference layout)
+
+Keep a vendored copy beside the profile for reference:
+
+```sh
+mkdir -p ~/.dsh/profiles/web/vendor/web-search
+cp README.md index.js lmstudioSearch.js package.json \
+  ~/.dsh/profiles/web/vendor/web-search/
+```
+
+This copy is not resolved by the loader — it is a reference of the source.
+The loader resolves the shared-tree copy from step 1.
+
+### 3. Add the rows to the target profile's `cordis.patch.yml`
 
 Edit `~/.dsh/profiles/<name>/cordis.patch.yml` (the user patch layer,
 applied after every bundle layer) and append:
@@ -57,19 +88,31 @@ Notes:
 - `searchProvider` can alternatively be set via `$DSH_WEB_SEARCH_PROVIDER`,
   but the config row persists.
 
-### 3. Verify
+### 4. Verify
 
 ```sh
 # composition: the row is inserted and the seam points at the new provider
-dsh --profile <name> --dump-config | grep -B1 -A6 'id: web$'
+dsh --profile web --dump-config | grep -B1 -A6 'id: web$'
+
+# direct search (no LLM): confirm the provider returns results
+cd ~/.dsh/profiles/web && node -e '
+import("web-search").then(async (m) => {
+  const ctx = { web: { registerSearchProvider: (p) => { globalThis.__p = p; } } };
+  m.apply(ctx, { defaultLanguage: "en-us", searchRecencyWindow: "year" });
+  const res = await globalThis.__p.search({ query: "DeepSeek Harness" }, new AbortController().signal);
+  console.log("sources:", res.sources.length, "top:", res.sources[0]?.url);
+}).catch(e => { console.error(e.message); process.exit(1); });
+'
 
 # end-to-end (fresh headless session, patch passed as overlay if the target
 # profile is not the one being booted):
-dsh --profile headless --patch ~/.dsh/profiles/<name>/cordis.patch.yml \
+dsh --profile headless --patch ~/.dsh/profiles/web/cordis.patch.yml \
   "Use the web_search tool once, with query: 'DeepSeek Harness'. Reply with the top result's title and URL."
 ```
 
-A running `dsh web` session picks up the change via HMR without a restart.
+A running `dsh web` session picks up the change via HMR without a restart:
+the profile boot creates an HMR service even when the composed `hmr` row is
+disabled, and `watchUserPatches` re-applies the profile patch on change.
 
 ## Config
 
@@ -91,6 +134,9 @@ A running `dsh web` session picks up the change via HMR without a restart.
 - The `deepseek-official` provider stays registered if present in your base
   layer; it is simply no longer selected. Remove the `web` patch entry to
   revert.
+- `dsh plugin add` is not supported for this plugin: it declares no
+  `dsh.bundle`, so it installs as a plain dependency and never joins the
+  layer stack. Copy to the shared tree instead (step 1).
 
 ## Attribution
 
