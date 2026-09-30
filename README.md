@@ -138,9 +138,48 @@ disabled, and `watchUserPatches` re-applies the profile patch on change.
   `dsh.bundle`, so it installs as a plain dependency and never joins the
   layer stack. Copy to the shared tree instead (step 1).
 
+## opencode plugin
+
+The same keyless tiered engine is also available as an **opencode custom tool**
+(`web_search`). Unlike the DSH provider it is a single self-contained file
+(the engine is inlined so it is a one-file drop-in) that registers the tool with
+opencode's `tool()` API.
+
+### Install
+
+```sh
+mkdir -p ~/.config/opencode/plugins
+cp opencode/web-search.js ~/.config/opencode/plugins/web-search.js
+```
+
+Restart opencode (plugins in `~/.config/opencode/plugins/` load at startup). The
+`@opencode-ai/plugin` package already resolves from `~/.config/opencode/node_modules`,
+so no install step is needed. Each `.js` in the plugins dir is loaded as a plugin,
+which is why the engine is inlined rather than shared with `lmstudioSearch.js`.
+
+### Usage
+
+The `web_search` tool takes `query` (string, required) and an optional
+`maxResults` (3–20, default 8) and returns a text list of title/URL/snippet.
+
+Config is fixed in code at the top of the file (the `CONFIG` block:
+`searxngUrl`, `lmStudioUrl`, `locale`, `time`, `defaultMax`) — edit there to
+change the search tier, language or recency. `lmStudioUrl` is empty by default,
+so the `nomic-embed-text` rerank is off.
+
+```sh
+node --input-type=module -e '
+import { WebSearch } from "file://'"$HOME"'/.config/opencode/plugins/web-search.js";
+const def = (await WebSearch()).tool.web_search;
+const r = await def.execute({ query: "DeepSeek Harness" }, { abort: new AbortController().signal });
+console.log(r.output);
+'
+```
+
 ## Attribution
 
 Search engine (`lmstudioSearch.js`) vendored verbatim from
 `web-search-plugin` v1.0.1 by thrilok,
 [https://lmstudio.ai/altra/web-search](https://lmstudio.ai/altra/web-search),
-MIT licensed. The adapter (`index.js`) and this README are new.
+MIT licensed. The adapter (`index.js`), this README, and the opencode
+`web-search.js` are new.
