@@ -1,20 +1,21 @@
 // # opencode web_search tool
 //
 // Custom opencode tool (`web_search`) that exposes keyless, tiered web search —
-// SearXNG (if configured) → DuckDuckGo HTML → Bing HTML fallback — backed by the
-// same search engine as the DSH `web-search` provider
-// (https://github.com/amitpandey-io/web-search, itself ported from the LM Studio
-// web-search plugin v1.0.1 by thrilok, MIT). No API key required.
+// SearXNG (if configured) → DuckDuckGo HTML → Bing HTML fallback. No API key
+// required.
 //
 // Loaded automatically from ~/.config/opencode/plugins/. Fixed in-code config;
 // edit the CONFIG block below to change the search tier, language or recency.
+//
+// Search engine functions derive from web-search-plugin v1.0.1 (MIT).
 
 import { tool } from "@opencode-ai/plugin";
 
 // --- CONFIG (fixed in code) -------------------------------------------------
 const CONFIG = {
 	searxngUrl: "", // self-hosted SearXNG base URL; "" = built-in DDG/Bing
-	lmStudioUrl: "", // local LM Studio for nomic-embed-text rerank; "" = off
+	embeddingsUrl: "", // OpenAI-compatible embeddings base URL for rerank (e.g. local server); "" = off
+	rerankModel: "nomic-embed-text", // embedding model used for rerank
 	locale: "en-us", // language/region for results
 	time: "y", // recency: d|w|m|y|"" (day|week|month|year|any)
 	defaultMax: 8, // results per query (3-20)
@@ -22,7 +23,7 @@ const CONFIG = {
 
 const SEARXNG_TIME = { d: "day", w: "week", m: "month", y: "year" };
 
-// --- search engine (vendored from the reference lmstudioSearch.js) ----------
+// --- search engine ----------------------------------------------------------
 
 function decodeHtmlEntities(s) {
 	return s
@@ -140,11 +141,11 @@ async function searchWeb(query, maxResults, time, locale, searxngUrl, signal) {
 		return [];
 	}
 }
-async function embedTexts(texts, baseUrl) {
+async function embedTexts(texts, baseUrl, model) {
 	const res = await fetch(baseUrl + "/v1/embeddings", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ model: "nomic-embed-text", input: texts }),
+		body: JSON.stringify({ model, input: texts }),
 		signal: AbortSignal.timeout(10_000),
 	});
 	if (!res.ok)
@@ -161,8 +162,8 @@ function cosine(a, b) {
 	}
 	return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
-/** Optional rerank via a local LM Studio embeddings endpoint; any failure keeps the original order. */
-async function rerankHits(query, hits, baseUrl) {
+/** Optional rerank via an OpenAI-compatible embeddings endpoint; any failure keeps the original order. */
+async function rerankHits(query, hits, baseUrl, model) {
 	if (hits.length <= 1)
 		return hits;
 	try {
@@ -170,7 +171,7 @@ async function rerankHits(query, hits, baseUrl) {
 			`search_query: ${query}`,
 			...hits.map((h) => `search_document: ${h.title} ${h.snippet}`),
 		];
-		const embeddings = await embedTexts(inputs, baseUrl);
+		const embeddings = await embedTexts(inputs, baseUrl, model);
 		if (embeddings.length !== inputs.length)
 			return hits;
 		const queryEmb = embeddings[0];
@@ -222,8 +223,8 @@ export const WebSearch = async () => {
 						CONFIG.searxngUrl,
 						context.abort,
 					);
-					if (CONFIG.lmStudioUrl && hits.length > 1)
-						hits = await rerankHits(args.query, hits, CONFIG.lmStudioUrl);
+					if (CONFIG.embeddingsUrl && hits.length > 1)
+						hits = await rerankHits(args.query, hits, CONFIG.embeddingsUrl, CONFIG.rerankModel);
 					return { title: `Web search: ${args.query}`, output: formatResults(args.query, hits) };
 				},
 			}),

@@ -163,9 +163,11 @@ The `web_search` tool takes `query` (string, required) and an optional
 `maxResults` (3–20, default 8) and returns a text list of title/URL/snippet.
 
 Config is fixed in code at the top of the file (the `CONFIG` block:
-`searxngUrl`, `lmStudioUrl`, `locale`, `time`, `defaultMax`) — edit there to
-change the search tier, language or recency. `lmStudioUrl` is empty by default,
-so the `nomic-embed-text` rerank is off.
+`searxngUrl`, `embeddingsUrl`, `rerankModel`, `locale`, `time`, `defaultMax`) —
+edit there to change the search tier, language or recency. `embeddingsUrl` is
+empty by default, so rerank is off; when set to any OpenAI-compatible
+embeddings server (e.g. a local one), results are reranked with
+`rerankModel` (default `nomic-embed-text`).
 
 ```sh
 node --input-type=module -e '
